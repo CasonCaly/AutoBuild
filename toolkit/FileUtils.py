@@ -1,6 +1,5 @@
 # coding:utf-8
-import os
-from HashMap import HashMap
+from toolkit.HashMap import HashMap
 # 文件实体类,用于存放上一次拷贝过程中记录下来的文件信息
 class CopyInfo:
 
