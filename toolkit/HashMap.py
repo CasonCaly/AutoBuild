@@ -23,3 +23,4 @@ class HashMap:
             return None
         else:
             return self.__dict[key]
+
