@@ -37,6 +37,12 @@ class XPObject(XPValue):
     def __init__(self):
         self.m_mapAtribute = HashMap()
 
+    def addChild(self, xpValue):
+        super.addChild(xpValue)
+        if isinstance(xpValue, XPAttribute):
+            self.addValue(xpValue.getKey(), xpValue.getValue())
+        return
+
     def addValue(self, key, xpValue):
         self.m_mapAtribute.insert(key, xpValue)
 
