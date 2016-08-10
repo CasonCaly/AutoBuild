@@ -11,7 +11,7 @@ class List:
         self.m_list.append(ele)
 
     def isEmpty(self):
-        return 0 != self.m_count
+        return 0 == self.m_count
 
     def count(self):
         return self.m_count

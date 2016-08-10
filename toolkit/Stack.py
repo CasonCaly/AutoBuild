@@ -20,7 +20,7 @@ class Stack:
     def top(self):
         if 0 == self.m_count:
             return None
-        return self.m_list[self.m_count]
+        return self.m_list[self.m_count - 1]
 
     def isEmpty(self):
-        return 0 != self.m_count
+        return 0 == self.m_count

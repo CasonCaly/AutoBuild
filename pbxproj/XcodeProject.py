@@ -1,6 +1,7 @@
-#coding:utf-8
+# coding:utf-8
 
-
+import os
+from XcodeProjectDecoder import XcodeProjectDecoder
 
 
 class XcodeProject:
@@ -11,12 +12,19 @@ class XcodeProject:
 
     def parse(self):
         fullPath = self.m_projectPath + "/" + self.m_projectName + ".xcodeproj/project.pbxproj"
-        project = XcodeProject.Load(fullPath)
-        return project
+        if not os.path.exists(fullPath):
+            return False
+
+        file = open(fullPath)
+        allText = file.read()
+        project = XcodeProjectDecoder()
+        project.decode(allText)
+
+        return True
 
     def decode(self):
 
         return
 
-xcodeProj = Xcodeproj("F:/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_libs")
+xcodeProj = XcodeProject("F:/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_tests")
 project = xcodeProj.parse()

@@ -1,6 +1,11 @@
 # coding:utf-8
-from toolkit import Stack
+from toolkit.Stack import Stack
 from XPValue import XPDocument
+from XPValue import XPComments
+from XPValue import XPObject
+from XPValue import XPAttribute
+from XPValue import XPArray
+from XPValue import XPString
 
 """
 解码状态机中状态基类
@@ -8,12 +13,12 @@ from XPValue import XPDocument
 
 
 class ParseResult:
-    Error = 1  # 出现错误
-    NeedSwitch = 2  # 需要切换状态
-    Pending = 3  # 未决，表示还未解析完成
-    Finish = 4  # 解析成功并且完成
-    AppendChild = 5  # 附加新的子解码器
-    AppendSibling = 6  # 附加新的兄弟解码器
+    Error = 1           # 出现错误
+    NeedSwitch = 2      # 需要切换状态
+    Pending = 3         # 未决，表示还未解析完成
+    Finish = 4          # 解析成功并且完成
+    AppendChild = 5     # 附加新的子解码器
+    AppendSibling = 6   # 附加新的兄弟解码器
 
     PendingParseResult = None
     FinishParseResult = None
@@ -52,7 +57,7 @@ class ParseResult:
         if None == ParseResult.FinishParseResult:
             ParseResult.FinishParseResult = ParseResult(ParseResult.Finish)
 
-        return ParseResult.PendingParseResult
+        return ParseResult.FinishParseResult
 
     @classmethod
     def needSwitch(cls, nextDecoderName, backNum):
@@ -82,18 +87,18 @@ class ParseResult:
 
 
 class Decoder:
+
     def __init__(self):
         self.m_isEnd = False
         self.m_statementStartIndex = -1
         self.m_statementLength = 0
-        self.m_xpValue = None
         return
 
     def parseBegin(self, index):
         if self.m_statementStartIndex == -1:
             self.m_statementStartIndex = index
 
-    def parse(self, ch, index):
+    def parse(self, rawText, ch, index):
         if self.m_statementStartIndex == -1:
             self.m_statementStartIndex = index
         self.m_statementLength += 1
@@ -102,12 +107,12 @@ class Decoder:
         self.m_statementLength += 1
 
     def genXPValue(self):
-        return self.m_xpValue
+        return None
 
     def allowGenXPValueBeforeFinish(self):
         return True
 
-    def allowHasChild(self):
+    def allowHasChild(self, rawText):
         return True
 """
 行注释解码
@@ -115,16 +120,17 @@ class Decoder:
 
 
 class LineCommentsDecoder(Decoder):
-    def __init__(self):
 
+    def __init__(self):
+        Decoder.__init__(self)
         return
 
-    def parse(self, ch, index):
+    def parse(self, rawText, ch, index):
         if self.m_statementLength == 1:
             if ch == '*':  # 如果碰到*表示本次是块注释
-                return Decoder.needSwitch("ChunckCommentsDecoder", 2)  # 回退两个字符,并转为块注释
+                return ParseResult.needSwitch("ChunckCommentsDecoder", 1)  # 回退两个字符,并转为块注释
             elif ch != '/':
-                return Decoder.error()
+                return ParseResult.error()
         elif ch == '\n':  # 碰到换行表示结束
             return ParseResult.finish()
 
@@ -133,86 +139,198 @@ class LineCommentsDecoder(Decoder):
     def allowGenXPValueBeforeFinish(self):
         return False
 
-    def allowHasChild(self):
+    def allowHasChild(self, rawText):
         return False
+
+    def genXPValue(self, rawText):
+        start = self.m_statementStartIndex + 2  # 从//之后开始所以是要加2
+        end = self.m_statementStartIndex + self.m_statementLength - 1 # 去掉\n
+        comments = rawText[start:end]
+        return XPComments(True, comments)
+
 """
 块注释解码
 """
 
 
 class ChunckCommentsDecoder(Decoder):
+
     def __init__(self):
+        Decoder.__init__(self)
         self.m_isEndStar = False
         return
 
-    def parse(self, ch, index):
+    def parse(self, rawText, ch, index):
         if self.m_statementLength == 1:
             if ch != '*':  # 如果碰到*表示本次是块注释
-                return Decoder.error()
+                return ParseResult.error()
+            else:
+                return ParseResult.pending()
         elif ch == '*':
             self.m_isEndStar = True
-        elif ch == '/' and self.m_isEndStar:  # 遇到*/表示注释结束
-            return ParseResult.finish()
+            return ParseResult.pending()
         else:
-            self.m_isEndStar = False
+            if self.m_isEndStar:  # 遇到*/表示注释结束
+                if ch != '/':
+                    return ParseResult.error()
+                else:
+                    return ParseResult.finish()
+            else:
+                return ParseResult.pending()
 
-        return ParseResult.pending()
-
-    def allowHasChild(self):
+    def allowHasChild(self, rawText):
         return False
 
+    def allowGenXPValueBeforeFinish(self):
+        return False
+
+    def genXPValue(self, rawText):
+        start = self.m_statementStartIndex + 2  # // /*
+        end = self.m_statementStartIndex + self.m_statementLength
+        comments = rawText[start:end]
+        return XPComments(False, comments)
 """
-对象状态
+带""的字符串解码
+"""
+
+
+class StringDecoder(Decoder):
+
+    def __init__(self):
+        Decoder.__init__(self)
+        return
+
+    def parse(self, rawText, ch, index):
+        if self.m_statementLength == 0:
+            return ParseResult.pending()
+        if ch == '"':
+            return ParseResult.finish()
+        else:
+            return ParseResult.pending()
+
+    def genXPValue(self, rawText):
+        start = self.m_statementStartIndex
+        end = self.m_statementStartIndex + self.m_statementLength
+        string = rawText[start:end]
+        return XPString(string)
+"""
+对象解码
 """
 
 
 class ObjectDecoder(Decoder):
+
     def __init__(self):
+        Decoder.__init__(self)
         return
 
-    def parse(self, ch, index):
-        if ch != ' ' and ch != '\r' and ch != '\n' and ch != '\t':
-            if ch == '/':
-                return ParseResult.appendChild("LineCommandDecoder")
-            else:
-                return ParseResult.appendChild("KeyValueDecoder")
+    def parse(self, rawText, ch, index):
+        if self.m_statementLength == 0:
+            return ParseResult.pending()
+
+        if ch == ' ' or ch == '\r' or ch == '\n' or ch == '\t':
+            return ParseResult.pending()
+
+        if ch == '/':
+            return ParseResult.appendChild("LineCommentsDecoder")
         elif ch == '}':
             return ParseResult.finish()
-        return ParseResult.pending()
+        else:
+            return ParseResult.appendChild("AttributeDecoder")
 
-
+    def genXPValue(self, rawText):
+        return XPObject()
 """
-键值对状态
+属性解码
 """
 
 
-class KeyValueDecoder(Decoder):
+class AttributeDecoder(Decoder):
     def __init__(self):
+        Decoder.__init__(self)
+        self.m_attrValue = None
+        self.m_keyStart = -1
+        self.m_keyEnd = -1
+        self.m_valueStart = -1
+        self.m_valueEnd = -1
         return
 
-    def parse(self, ch, index):
-        if ch != ' ' and ch != '\r' and ch != '\n' and ch != '\t':
-            if ch == '/':
-                return ParseResult.appendChild("LineCommandDecoder")
-            elif ch == '{':
-                return ParseResult.appendChild("ObjectDecoder")
-        elif ch == ';':
-            return ParseResult.finish()
-        return ParseResult.pending()
+    def parse(self, rawText, ch, index):
+        if ch == ' ' or ch == '\r' or ch == '\n' or ch == '\t':
+            return ParseResult.pending()
+
+        if ch == '/':
+            nextCh = rawText[index + 1]
+            if nextCh != '/' and nextCh != '*':
+                return ParseResult.pending()
+            else:
+                return ParseResult.appendChild("LineCommentsDecoder")
+        elif ch == '"':
+            if -1 == self.m_keyStart:
+                self.m_keyStart = index
+            return ParseResult.appendChild("StringDecoder")
+        elif ch == '{':
+            return ParseResult.appendChild("ObjectDecoder")
+        elif ch == '(':
+            return ParseResult.appendChild("ArrayDecoder")
+        else:
+            if -1 == self.m_keyStart:
+                self.m_keyStart = index
+
+            if ch == '=':
+                if (self.m_keyStart == index) or (self.m_valueStart != -1):
+                    return ParseResult.error()
+                self.m_keyEnd = index
+                self.genXPValue(rawText)
+                key = rawText[self.m_keyStart:self.m_keyEnd]
+                self.m_attrValue.setKey(key)
+                self.m_attrValue.addChild(XPString(key))
+                self.m_valueStart = index + 1
+            elif ch == ';':
+                self.m_valueEnd = index
+                self.genXPValue(rawText)
+                value = rawText[self.m_valueStart:self.m_valueEnd]
+                self.m_attrValue.setValue(value)
+                self.m_attrValue.addChild(XPString(value))
+                return ParseResult.finish()
+
+            return ParseResult.pending()
+
+    def genXPValue(self, rawText):
+        if None == self.m_attrValue:
+            self.m_attrValue = XPAttribute()
+        return self.m_attrValue
+
+"""
+数组解码
+"""
 
 
 class ArrayDecoder(Decoder):
+
     def __init__(self):
+        Decoder.__init__(self)
+        self.m_arrValue = None
         return
 
-    def parse(self, ch, index):
-        if ch != ' ' and ch != '\r' and ch != '\n' and ch != '\t':
-            if ch == '/':
-                return ParseResult.appendChild("LineCommandDecoder")
+    def parse(self, rawText, ch, index):
+        if ch == ' ' or ch == '\r' or ch == '\n' or ch == '\t':
+            return ParseResult.pending()
+
+        if ch == '/':
+            return ParseResult.appendChild("LineCommentsDecoder")
+        elif ch == '"':
+            return ParseResult.appendChild("StringDecoder")
         elif ch == ',':
+            return ParseResult.pending()
+        elif ch == ')':
             return ParseResult.finish()
         return ParseResult.pending()
 
+    def genXPValue(self, rawText):
+        if None == self.m_arrValue:
+            self.m_arrValue = XPArray()
+        return self.m_arrValue
 
 """
 工程文件解码器
@@ -220,42 +338,46 @@ class ArrayDecoder(Decoder):
 
 
 class XcodeProjectDecoder:
+
     def __init__(self):
         self.m_stateStack = Stack()
         self.m_document = XPDocument()
         self.m_curValue = self.m_document
         return
 
+    # 解码器的主人口
     def decode(self, rawString):
         ch = rawString[0]
         index = 0
-        while (ch != 0):
+        length = len(rawString)
+        while (ch != 0 and index < length):
             ch = rawString[index]
 
             if self.m_stateStack.isEmpty():
-                autoDecoder = self.autoSelect(ch)
+                self.autoSelect(rawString, ch)
 
             topDecoder = self.m_stateStack.top()
+            if None == topDecoder:
+                index += 1
+                continue
+
             topDecoder.parseBegin(index)
-            decodeResult = topDecoder.parse(ch, index)
+            decodeResult = topDecoder.parse(rawString, ch, index)
 
             decodeState = decodeResult.getState()
             if decodeState == ParseResult.Pending:
                 topDecoder.parseEnd()
-                continue
             elif decodeState == ParseResult.NeedSwitch:
-                index -= decodeState.getBackNum()
-                self.needSwitch(decodeState)
+                index -= decodeResult.getBackNum()
+                self.needSwitch(rawString, decodeResult)
                 continue
             elif decodeState == ParseResult.AppendChild:
-                index -= decodeState.getBackNum()
-                self.appendChild(decodeState)
+                index -= decodeResult.getBackNum()
+                self.appendChild(rawString, decodeResult)
                 continue
             elif decodeState == ParseResult.Finish:
-                decodeState.parseEnd()
-                ch = rawString[index + 1]
-                self.finish()
-                self.autoSelect(ch)
+                topDecoder.parseEnd()
+                self.finish(rawString)
             elif decodeState == ParseResult.Error:
                 break
 
@@ -263,7 +385,7 @@ class XcodeProjectDecoder:
         return
 
     # 自动选择解码器
-    def autoSelect(self, ch):
+    def autoSelect(self, rawText, ch):
         decoder = None
         if ch == '/':
             decoder = LineCommentsDecoder()
@@ -274,44 +396,50 @@ class XcodeProjectDecoder:
         elif ch != ' ' and ch != '\r' and ch != '\n' and ch != '\t':
             return
         else:
-            decoder = KeyValueDecoder()
+            decoder = AttributeDecoder()
 
         self.m_stateStack.push(decoder)
         if decoder.allowGenXPValueBeforeFinish():
-            xpValue = decoder.genXPValue()
-            self.m_curValue.addChild(xpValue)
-            if decoder.allowHasChild():
+            xpValue = decoder.genXPValue(rawText)
+            xpValue.setParent(self.m_curValue)
+            if decoder.allowHasChild(rawText):
                 self.m_curValue = xpValue
 
         return decoder
 
     # 当需要切换状态是怎么处理
-    def needSwitch(self, decodeState):
-        nextDecoder = decodeState.genNextDecoder()
+    def needSwitch(self, rawText, decodeResult):
+        nextDecoder = decodeResult.genNextDecoder()
         self.m_stateStack.pop()
         self.m_stateStack.push(nextDecoder)
         if nextDecoder.allowGenXPValueBeforeFinish():
-            xpValue = nextDecoder.genXPValue()
-            self.m_curValue.addChild(xpValue)
-            if nextDecoder.allowHasChild():
+            xpValue = nextDecoder.genXPValue(rawText)
+            xpValue.setParent(self.m_curValue)
+            if nextDecoder.allowHasChild(rawText):
                 self.m_curValue = xpValue
         return
 
-    def appendChild(self, decodeState):
-        nextDecoder = decodeState.genNextDecoder()
+    def appendChild(self, rawText, decodeResult):
+        nextDecoder = decodeResult.genNextDecoder()
         self.m_stateStack.push(nextDecoder)
         if nextDecoder.allowGenXPValueBeforeFinish():
-            xpValue = nextDecoder.genXPValue()
-            self.m_curValue.addChild(xpValue)
-            if nextDecoder.allowHasChild():
+            xpValue = nextDecoder.genXPValue(rawText)
+            xpValue.setParent(self.m_curValue)
+            if nextDecoder.allowHasChild(rawText):
                 self.m_curValue = xpValue
         return
 
-    def finish(self):
+    def finish(self, rawText):
         topDecoder = self.m_stateStack.pop()
         if not topDecoder.allowGenXPValueBeforeFinish():
-            xpValue = topDecoder.genXPValue()
+            xpValue = topDecoder.genXPValue(rawText)
             self.m_curValue.addChild(xpValue)
         else:# 当解析完成之后之后，需要把当前的Value还原成parent
-            self.m_curValue = self.m_curValue.getParent()
+            if topDecoder.allowHasChild(rawText):
+                xpValue = self.m_curValue
+                self.m_curValue = xpValue.getParent()
+                self.m_curValue.addChild(xpValue)
+            else:
+                xpValue = topDecoder.genXPValue(rawText)
+                self.m_curValue.addChild(xpValue)
         return
