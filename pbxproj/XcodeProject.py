@@ -1,6 +1,7 @@
 # coding:utf-8
-
+import time
 import os
+import datetime
 from XcodeProjectDecoder import XcodeProjectDecoder
 
 
@@ -26,5 +27,9 @@ class XcodeProject:
 
         return
 
+d1 = datetime.datetime.now()
 xcodeProj = XcodeProject("F:/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_tests")
 project = xcodeProj.parse()
+d2 = datetime.datetime.now()
+diff = d2-d1
+print diff
