@@ -16,7 +16,6 @@ from XPValue import XPString
 
 
 class DecoderCacheItem:
-
     def __init__(self, decoderName):
         self.m_decoderName = decoderName
         self.m_usedSet = Set()
@@ -34,7 +33,7 @@ class DecoderCacheItem:
     def resumeDecoder(self, decoder):
         if None == self.m_usedSet.find(decoder):
             # self.m_unusedQueue.push(decoder)
-            print ("未能在%s的缓存中发现要回收的解码器"%(self.m_decoderName))
+            print ("未能在%s的缓存中发现要回收的解码器" % (self.m_decoderName))
         else:
             decoder.clean()
             self.m_usedSet.erase(decoder)
@@ -42,11 +41,10 @@ class DecoderCacheItem:
 
 
 class DecoderCache:
-
     s_instance = None
 
     def __init__(self):
-        self.m_mapDecoder = HashMap() # HashMap<string, DecoderCacheItem>
+        self.m_mapDecoder = HashMap()  # HashMap<string, DecoderCacheItem>
 
     def newDecoder(self, decoderName):
         cacheItem = self.m_mapDecoder.find(decoderName)
@@ -73,15 +71,15 @@ class DecoderCache:
 
 
 class ParseResult:
-    Error = 1           # 出现错误
-    Pending = 2         # 未决，表示还未解析完成
-    Finish = 3          # 解析成功并且完成
-    AppendChild = 4     # 附加新的子解码器
+    Error = 1  # 出现错误
+    Pending = 2  # 未决，表示还未解析完成
+    Finish = 3  # 解析成功并且完成
+    AppendChild = 4  # 附加新的子解码器
 
     PendingParseResult = None
     FinishParseResult = None
 
-    s_resultCache = Queue() # Has
+    s_resultCache = Queue()  # Res
 
     def __init__(self, state):
         self.m_state = state
@@ -145,8 +143,8 @@ class ParseResult:
     def resumeResult(cls, result):
         ParseResult.s_resultCache.push(result)
 
-class Decoder:
 
+class Decoder:
     def __init__(self):
         self.m_isEnd = False
         self.m_statementStartIndex = -1
@@ -165,6 +163,12 @@ class Decoder:
     def parseEnd(self):
         self.m_statementLength += 1
 
+    def increaseStatementLenght(self, diffStatementLength):
+        self.m_statementLength += diffStatementLength
+
+    def getStatementLength(self):
+        return self.m_statementLength
+
     def genXPValue(self):
         return None
 
@@ -182,21 +186,22 @@ class Decoder:
 
     def className(self):
         return "Decoder"
+
+
 """
 行注释解码
 """
 
 
 class CommentsDecoder(Decoder):
-
     def __init__(self):
         Decoder.__init__(self)
         self.m_isLine = True
-        self.m_isEndStar = False # 是否是块注释后面的*
+        self.m_isEndStar = False  # 是否是块注释后面的*
         return
 
     def parse(self, rawText, ch, index):
-        if self.m_statementLength == 1: # 检测第二个字符
+        if self.m_statementLength == 1:  # 检测第二个字符
             if ch == '*':  # 如果碰到*表示本次是块注释
                 self.m_isLine = False
                 return ParseResult.pending()
@@ -227,7 +232,7 @@ class CommentsDecoder(Decoder):
     def genXPValue(self, rawText):
         if self.m_isLine:
             start = self.m_statementStartIndex + 2  # 从//之后开始所以是要加2
-            end = self.m_statementStartIndex + self.m_statementLength - 1 # 去掉\n
+            end = self.m_statementStartIndex + self.m_statementLength - 1  # 去掉\n
             comments = rawText[start:end]
             return XPComments(True, comments)
         else:
@@ -244,13 +249,14 @@ class CommentsDecoder(Decoder):
 
     def className(self):
         return "CommentsDecoder"
+
+
 """
 带""的字符串解码
 """
 
 
 class StringDecoder(Decoder):
-
     def __init__(self):
         Decoder.__init__(self)
         return
@@ -269,8 +275,12 @@ class StringDecoder(Decoder):
         string = rawText[start:end]
         return XPString(string)
 
+    def allowGenXPValueBeforeFinish(self):
+        return False
+    
     def className(self):
         return "StringDecoder"
+
 
 """
 对象解码
@@ -278,7 +288,6 @@ class StringDecoder(Decoder):
 
 
 class ObjectDecoder(Decoder):
-
     def __init__(self):
         Decoder.__init__(self)
         return
@@ -302,13 +311,14 @@ class ObjectDecoder(Decoder):
 
     def className(self):
         return "ObjectDecoder"
+
+
 """
 属性解码
 """
 
 
 class AttributeDecoder(Decoder):
-
     def __init__(self):
         Decoder.__init__(self)
         self.m_attrValue = None
@@ -375,16 +385,20 @@ class AttributeDecoder(Decoder):
 
     def className(self):
         return "AttributeDecoder"
+
+
 """
 数组解码
 """
 
 
 class ArrayDecoder(Decoder):
-
     def __init__(self):
         Decoder.__init__(self)
         self.m_arrValue = None
+        self.m_nextValueBegin = -1
+        self.m_nextValueLength = 0
+        self.m_valueWithQuotation = False  # 数组的值是否有引号
         return
 
     def parse(self, rawText, ch, index):
@@ -395,12 +409,26 @@ class ArrayDecoder(Decoder):
             nextCh = rawText[index + 1]
             if nextCh == '/' or nextCh == '*':
                 return ParseResult.appendChild("CommentsDecoder")
+            else:
+                if -1 != self.m_nextValueBegin:
+                    self.m_nextValueLength += 1
         elif ch == '"':
+            self.m_valueWithQuotation = True
             return ParseResult.appendChild("StringDecoder")
         elif ch == ',':
+            if not self.m_valueWithQuotation:  # 如果有引号的话不需要处理StringDecoder会自动把值加入到XPArray中
+                strValue = rawText[self.m_nextValueBegin:self.m_nextValueBegin + self.m_nextValueLength]
+                self.genXPValue(rawText)
+                self.m_arrValue.addChild(XPString(strValue))
+            self.cleanValueInfo()
             return ParseResult.pending()
         elif ch == ')':
             return ParseResult.finish()
+        else:
+            if 0 != self.m_statementLength:
+                if -1 == self.m_nextValueBegin:
+                    self.m_nextValueBegin = index
+                self.m_nextValueLength += 1
         return ParseResult.pending()
 
     def genXPValue(self, rawText):
@@ -408,20 +436,27 @@ class ArrayDecoder(Decoder):
             self.m_arrValue = XPArray()
         return self.m_arrValue
 
+    def cleanValueInfo(self):
+        self.m_nextValueBegin = -1
+        self.m_valueWithQuotation = False
+        self.m_nextValueLength = 0
+
     def clean(self):
         Decoder.clean(self)
+        self.cleanValueInfo()
         self.m_arrValue = None
         return
 
     def className(self):
         return "ArrayDecoder"
+
+
 """
 工程文件解码器
 """
 
 
 class XcodeProjectDecoder:
-
     def __init__(self):
         self.m_stateStack = Stack()
         self.m_document = XPDocument()
@@ -481,6 +516,8 @@ class XcodeProjectDecoder:
         self.m_stateStack.push(decoder)
         if decoder.allowGenXPValueBeforeFinish():
             xpValue = decoder.genXPValue(rawText)
+            if None == xpValue:
+                print "Xcode ProjectDecoder Error"
             xpValue.setParent(self.m_curValue)
             if decoder.allowHasChild(rawText):
                 self.m_curValue = xpValue
@@ -499,16 +536,22 @@ class XcodeProjectDecoder:
 
     def finish(self, rawText):
         topDecoder = self.m_stateStack.pop()
+        statementLength = topDecoder.getStatementLength()
+
         if not topDecoder.allowGenXPValueBeforeFinish():
             xpValue = topDecoder.genXPValue(rawText)
             self.m_curValue.addChild(xpValue)
-        else:# 当解析完成之后之后，需要把当前的Value还原成parent
+        else:  # 当解析完成之后之后，需要把当前的Value还原成parent
             if topDecoder.allowHasChild(rawText):
                 xpValue = self.m_curValue
                 self.m_curValue = xpValue.getParent()
                 self.m_curValue.addChild(xpValue)
             else:
                 xpValue = topDecoder.genXPValue(rawText)
+
                 self.m_curValue.addChild(xpValue)
+        newTopDecoder = self.m_stateStack.top()
+        if None != newTopDecoder:
+            newTopDecoder.increaseStatementLenght(statementLength)
         DecoderCache.getInstance().resumeDecoder(topDecoder)
         return

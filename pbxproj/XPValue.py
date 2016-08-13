@@ -6,11 +6,13 @@ from toolkit.HashMap import HashMap
 class XPValue:
 
     def __init__(self):
-        self.m_children = List()
+        self.m_children = None
         self.m_parent = None
 
     def addChild(self, xpValue):
         xpValue.m_parent = self
+        if None == self.m_children:
+            self.m_children = List()
         self.m_children.pushBack(xpValue)
 
     def getParent(self):
