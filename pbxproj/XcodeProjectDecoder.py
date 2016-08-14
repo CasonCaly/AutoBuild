@@ -257,6 +257,9 @@ class CommentsDecoder(Decoder):
 
 
 class StringDecoder(Decoder):
+
+    # allocCount = 1
+
     def __init__(self):
         Decoder.__init__(self)
         return
