@@ -6,14 +6,14 @@ from toolkit.HashMap import HashMap
 class XPValue:
 
     def __init__(self):
-        self.m_children = None
+        self.m_count = 0
+        self.m_children = []
         self.m_parent = None
 
     def addChild(self, xpValue):
         xpValue.m_parent = self
-        if None == self.m_children:
-            self.m_children = List()
-        self.m_children.pushBack(xpValue)
+        self.m_count += 1
+        self.m_children.append(xpValue)
 
     def getParent(self):
         return self.m_parent
@@ -46,12 +46,12 @@ class XPObject(XPValue):
 
     def __init__(self):
         XPValue.__init__(self)
-        self.m_mapAtribute = HashMap()
+        self.m_mapAtribute = {}
 
     def addChild(self, xpValue):
         XPValue.addChild(self, xpValue)
         if isinstance(xpValue, XPAttribute):
-            self.addValue(xpValue.getKey(), xpValue.getValue())
+            self.m_mapAtribute[xpValue.m_key] = xpValue.m_value
         return
 
     def addValue(self, key, xpValue):
@@ -82,7 +82,7 @@ class XPAttribute(XPValue):
 
     def addChild(self, xpValue):
         if not isinstance(xpValue, XPComments):
-            self.setValue(xpValue)
+            self.m_value = xpValue
         XPValue.addChild(self, xpValue)
 
 class XPString(XPValue):

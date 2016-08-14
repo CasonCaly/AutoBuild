@@ -1,7 +1,5 @@
 # coding:utf-8
-from toolkit.Stack import Stack
-from toolkit.Queue import Queue
-from toolkit.Set import Set
+
 from toolkit.HashMap import HashMap
 from XPValue import XPDocument
 from XPValue import XPComments
@@ -22,7 +20,6 @@ class DecoderCacheItem:
         self.m_count = 0
 
     def newDecoder(self):
-        decoder = None
         if self.m_count == 0:
             decoder = eval(self.m_decoderName + "()")
         else:
@@ -40,19 +37,21 @@ class DecoderCache:
     s_instance = None
 
     def __init__(self):
-        self.m_mapDecoder = HashMap()  # HashMap<string, DecoderCacheItem>
+        self.m_mapDecoder = {}
 
     def newDecoder(self, decoderName):
-        cacheItem = self.m_mapDecoder.find(decoderName)
+        cacheItem = None
+        if decoderName in self.m_mapDecoder:
+            cacheItem = self.m_mapDecoder[decoderName]
+
         if cacheItem is None:
             cacheItem = DecoderCacheItem(decoderName)
-            self.m_mapDecoder.insert(decoderName, cacheItem)
+            self.m_mapDecoder[decoderName] = cacheItem
         return cacheItem.newDecoder()
 
     def resumeDecoder(self, decoder):
-        cacheItem = self.m_mapDecoder.find(decoder.className())
-        if cacheItem is not None:
-            cacheItem.resumeDecoder(decoder)
+        cacheItem = self.m_mapDecoder[decoder.className()]
+        cacheItem.resumeDecoder(decoder)
 
     @classmethod
     def getInstance(self):
@@ -75,7 +74,8 @@ class ParseResult:
     PendingParseResult = None
     FinishParseResult = None
 
-    s_resultCache = Queue()  # Res
+    s_resultCache = []
+    s_resultCacheCount = 0
 
     def __init__(self, state):
         self.m_state = state
@@ -119,17 +119,19 @@ class ParseResult:
     @classmethod
     def appendChild(cls, nextDecoderName):
         result = None
-        if ParseResult.s_resultCache.isEmpty():
+        if ParseResult.s_resultCacheCount == 0:
             result = ParseResult(ParseResult.AppendChild)
         else:
             result = ParseResult.s_resultCache.pop()
+            ParseResult.s_resultCacheCount -= 1
             result.clean(ParseResult.AppendChild)
         result.setNextDecoderName(nextDecoderName)
         return result
 
     @classmethod
     def resumeResult(cls, result):
-        ParseResult.s_resultCache.push(result)
+        ParseResult.s_resultCache.append(result)
+        ParseResult.s_resultCacheCount += 1
 
 
 class Decoder:
@@ -449,8 +451,8 @@ class ArrayDecoder(Decoder):
 
 class XcodeProjectDecoder:
     def __init__(self):
-        self.m_stateStack = Stack()
-        self.m_stateStackInnerList = self.m_stateStack.m_list
+        self.m_decoderStack = []
+        self.m_decoderCount = 0
         self.m_document = XPDocument()
         self.m_curValue = self.m_document
         ParseResult.init()
@@ -464,10 +466,10 @@ class XcodeProjectDecoder:
         while (ch != 0 and index < length):
             ch = rawString[index]
 
-            if self.m_stateStack.m_count == 0:
+            if self.m_decoderCount == 0:
                 self.autoSelect(rawString, ch)
 
-            topDecoder = self.m_stateStackInnerList[self.m_stateStack.m_count - 1]
+            topDecoder = self.m_decoderStack[self.m_decoderCount - 1]
             if topDecoder is None:
                 index += 1
                 continue
@@ -476,8 +478,6 @@ class XcodeProjectDecoder:
                 topDecoder.m_statementStartIndex = index
 
             decodeResult = topDecoder.parse(rawString, ch, index)
-            if decodeResult is None:
-                break
             decodeState = decodeResult.m_state
             if decodeState == ParseResult.Pending:
                 topDecoder.m_statementLength += 1
@@ -510,7 +510,8 @@ class XcodeProjectDecoder:
         else:
             decoder = decoderCache.newDecoder("AttributeDecoder")
 
-        self.m_stateStack.push(decoder)
+        self.m_decoderStack.append(decoder)
+        self.m_decoderCount += 1
         if decoder.allowGenXPValueBeforeFinish():
             xpValue = decoder.genXPValue(rawText)
             xpValue.setParent(self.m_curValue)
@@ -521,7 +522,8 @@ class XcodeProjectDecoder:
 
     def appendChild(self, rawText, decodeResult):
         nextDecoder = decodeResult.genNextDecoder()
-        self.m_stateStack.push(nextDecoder)
+        self.m_decoderStack.append(nextDecoder)
+        self.m_decoderCount += 1
         if nextDecoder.allowGenXPValueBeforeFinish():
             xpValue = nextDecoder.genXPValue(rawText)
             xpValue.setParent(self.m_curValue)
@@ -530,7 +532,8 @@ class XcodeProjectDecoder:
         return
 
     def finish(self, rawText):
-        topDecoder = self.m_stateStack.pop()
+        topDecoder = self.m_decoderStack.pop()
+        self.m_decoderCount -= 1
         statementLength = topDecoder.getStatementLength()
 
         if not topDecoder.allowGenXPValueBeforeFinish():
@@ -543,9 +546,12 @@ class XcodeProjectDecoder:
                 self.m_curValue.addChild(xpValue)
             else:
                 xpValue = topDecoder.genXPValue(rawText)
-
                 self.m_curValue.addChild(xpValue)
-        newTopDecoder = self.m_stateStack.top()
+
+        if 0 == self.m_decoderCount:
+            return
+
+        newTopDecoder = self.m_decoderStack[self.m_decoderCount - 1]
         if newTopDecoder is not None:
             newTopDecoder.increaseStatementLenght(statementLength)
         DecoderCache.getInstance().resumeDecoder(topDecoder)

@@ -41,5 +41,5 @@ def test():
     print diff
 
 if __name__ == "__main__":
-    test()
-    #cProfile.run("test()")
+    #test()
+    cProfile.run("test()")
