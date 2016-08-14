@@ -18,26 +18,22 @@ from XPValue import XPString
 class DecoderCacheItem:
     def __init__(self, decoderName):
         self.m_decoderName = decoderName
-        self.m_usedSet = Set()
-        self.m_unusedQueue = Queue()
+        self.m_unusedQueue = []
+        self.m_count = 0
 
     def newDecoder(self):
         decoder = None
-        if self.m_unusedQueue.isEmpty():
+        if self.m_count == 0:
             decoder = eval(self.m_decoderName + "()")
         else:
+            self.m_count -= 1
             decoder = self.m_unusedQueue.pop()
-        self.m_usedSet.insert(decoder)
         return decoder
 
     def resumeDecoder(self, decoder):
-        if None == self.m_usedSet.find(decoder):
-            # self.m_unusedQueue.push(decoder)
-            print ("未能在%s的缓存中发现要回收的解码器" % (self.m_decoderName))
-        else:
-            decoder.clean()
-            self.m_usedSet.erase(decoder)
-            self.m_unusedQueue.push(decoder)
+        decoder.clean()
+        self.m_count += 1
+        self.m_unusedQueue.append(decoder)
 
 
 class DecoderCache:
@@ -48,19 +44,19 @@ class DecoderCache:
 
     def newDecoder(self, decoderName):
         cacheItem = self.m_mapDecoder.find(decoderName)
-        if None == cacheItem:
+        if cacheItem is None:
             cacheItem = DecoderCacheItem(decoderName)
             self.m_mapDecoder.insert(decoderName, cacheItem)
         return cacheItem.newDecoder()
 
     def resumeDecoder(self, decoder):
         cacheItem = self.m_mapDecoder.find(decoder.className())
-        if None != cacheItem:
+        if cacheItem is not None:
             cacheItem.resumeDecoder(decoder)
 
     @classmethod
     def getInstance(self):
-        if None == DecoderCache.s_instance:
+        if DecoderCache.s_instance is None:
             DecoderCache.s_instance = DecoderCache()
         return DecoderCache.s_instance
 
@@ -94,7 +90,7 @@ class ParseResult:
         self.m_nextDecoderName = nextDecoderName
 
     def genNextDecoder(self):
-        if None == self.m_nextDecoderName:
+        if self.m_nextDecoderName is None:
             return None
         return DecoderCache.getInstance().newDecoder(self.m_nextDecoderName)
 
@@ -111,17 +107,9 @@ class ParseResult:
         self.m_backNum = 0
 
     @classmethod
-    def pending(cls):
-        if None == ParseResult.PendingParseResult:
-            ParseResult.PendingParseResult = ParseResult(ParseResult.Pending)
-        return ParseResult.PendingParseResult
-
-    @classmethod
-    def finish(cls):
-        if None == ParseResult.FinishParseResult:
-            ParseResult.FinishParseResult = ParseResult(ParseResult.Finish)
-
-        return ParseResult.FinishParseResult
+    def init(cls):
+        ParseResult.PendingParseResult = ParseResult(ParseResult.Pending)
+        ParseResult.FinishParseResult = ParseResult(ParseResult.Finish)
 
     @classmethod
     def error(cls):
@@ -204,13 +192,13 @@ class CommentsDecoder(Decoder):
         if self.m_statementLength == 1:  # 检测第二个字符
             if ch == '*':  # 如果碰到*表示本次是块注释
                 self.m_isLine = False
-                return ParseResult.pending()
+                return ParseResult.PendingParseResult
             elif ch != '/':  # 如果是行注释，同时第二个字符不是/那么就表示错误
                 return ParseResult.error()
 
         if self.m_isLine:
             if ch == '\n':  # 碰到换行表示结束
-                return ParseResult.finish()
+                return ParseResult.FinishParseResult
         else:
             if ch == '*':
                 self.m_isEndStar = True
@@ -219,9 +207,9 @@ class CommentsDecoder(Decoder):
                     if ch != '/':
                         return ParseResult.error()
                     else:
-                        return ParseResult.finish()
+                        return ParseResult.FinishParseResult
 
-        return ParseResult.pending()
+        return ParseResult.PendingParseResult
 
     def allowGenXPValueBeforeFinish(self):
         return False
@@ -266,11 +254,11 @@ class StringDecoder(Decoder):
 
     def parse(self, rawText, ch, index):
         if self.m_statementLength == 0:
-            return ParseResult.pending()
-        if ch == '"':
-            return ParseResult.finish()
+            return ParseResult.PendingParseResult
+        if ch != '"':
+            return ParseResult.PendingParseResult
         else:
-            return ParseResult.pending()
+            return ParseResult.FinishParseResult
 
     def genXPValue(self, rawText):
         start = self.m_statementStartIndex
@@ -297,15 +285,15 @@ class ObjectDecoder(Decoder):
 
     def parse(self, rawText, ch, index):
         if self.m_statementLength == 0:
-            return ParseResult.pending()
+            return ParseResult.PendingParseResult
 
         if ch == ' ' or ch == '\r' or ch == '\n' or ch == '\t':
-            return ParseResult.pending()
+            return ParseResult.PendingParseResult
 
         if ch == '/':
             return ParseResult.appendChild("CommentsDecoder")
         elif ch == '}':
-            return ParseResult.finish()
+            return ParseResult.FinishParseResult
         else:
             return ParseResult.appendChild("AttributeDecoder")
 
@@ -333,12 +321,12 @@ class AttributeDecoder(Decoder):
 
     def parse(self, rawText, ch, index):
         if ch == ' ' or ch == '\r' or ch == '\n' or ch == '\t':
-            return ParseResult.pending()
+            return ParseResult.PendingParseResult
 
         if ch == '/':
             nextCh = rawText[index + 1]
             if nextCh != '/' and nextCh != '*':
-                return ParseResult.pending()
+                return ParseResult.PendingParseResult
             else:
                 return ParseResult.appendChild("CommentsDecoder")
         elif ch == '"':
@@ -368,12 +356,12 @@ class AttributeDecoder(Decoder):
                 value = rawText[self.m_valueStart:self.m_valueEnd]
                 self.m_attrValue.setValue(value)
                 self.m_attrValue.addChild(XPString(value))
-                return ParseResult.finish()
+                return ParseResult.FinishParseResult
 
-            return ParseResult.pending()
+            return ParseResult.PendingParseResult
 
     def genXPValue(self, rawText):
-        if None == self.m_attrValue:
+        if self.m_attrValue is None:
             self.m_attrValue = XPAttribute()
         return self.m_attrValue
 
@@ -406,7 +394,7 @@ class ArrayDecoder(Decoder):
 
     def parse(self, rawText, ch, index):
         if ch == ' ' or ch == '\r' or ch == '\n' or ch == '\t':
-            return ParseResult.pending()
+            return ParseResult.PendingParseResult
 
         if ch == '/':
             nextCh = rawText[index + 1]
@@ -424,18 +412,18 @@ class ArrayDecoder(Decoder):
                 self.genXPValue(rawText)
                 self.m_arrValue.addChild(XPString(strValue))
             self.cleanValueInfo()
-            return ParseResult.pending()
+            return ParseResult.PendingParseResult
         elif ch == ')':
-            return ParseResult.finish()
+            return ParseResult.FinishParseResult
         else:
             if 0 != self.m_statementLength:
                 if -1 == self.m_nextValueBegin:
                     self.m_nextValueBegin = index
                 self.m_nextValueLength += 1
-        return ParseResult.pending()
+        return ParseResult.PendingParseResult
 
     def genXPValue(self, rawText):
-        if None == self.m_arrValue:
+        if self.m_arrValue is None:
             self.m_arrValue = XPArray()
         return self.m_arrValue
 
@@ -462,8 +450,10 @@ class ArrayDecoder(Decoder):
 class XcodeProjectDecoder:
     def __init__(self):
         self.m_stateStack = Stack()
+        self.m_stateStackInnerList = self.m_stateStack.m_list
         self.m_document = XPDocument()
         self.m_curValue = self.m_document
+        ParseResult.init()
         return
 
     # 解码器的主人口
@@ -474,26 +464,29 @@ class XcodeProjectDecoder:
         while (ch != 0 and index < length):
             ch = rawString[index]
 
-            if self.m_stateStack.isEmpty():
+            if self.m_stateStack.m_count == 0:
                 self.autoSelect(rawString, ch)
 
-            topDecoder = self.m_stateStack.top()
-            if None == topDecoder:
+            topDecoder = self.m_stateStackInnerList[self.m_stateStack.m_count - 1]
+            if topDecoder is None:
                 index += 1
                 continue
 
-            topDecoder.parseBegin(index)
-            decodeResult = topDecoder.parse(rawString, ch, index)
+            if topDecoder.m_statementStartIndex == -1:
+                topDecoder.m_statementStartIndex = index
 
-            decodeState = decodeResult.getState()
+            decodeResult = topDecoder.parse(rawString, ch, index)
+            if decodeResult is None:
+                break
+            decodeState = decodeResult.m_state
             if decodeState == ParseResult.Pending:
-                topDecoder.parseEnd()
+                topDecoder.m_statementLength += 1
             elif decodeState == ParseResult.AppendChild:
                 self.appendChild(rawString, decodeResult)
                 ParseResult.resumeResult(decodeResult)
                 continue
             elif decodeState == ParseResult.Finish:
-                topDecoder.parseEnd()
+                topDecoder.m_statementLength += 1
                 self.finish(rawString)
             elif decodeState == ParseResult.Error:
                 break
@@ -505,12 +498,13 @@ class XcodeProjectDecoder:
     def autoSelect(self, rawText, ch):
         decoderCache = DecoderCache.getInstance()
         decoder = None
-        if ch == '/':
-            decoder = decoderCache.newDecoder("CommentsDecoder")
-        elif ch == '{':
+
+        if ch == '{':
             decoder = decoderCache.newDecoder("ObjectDecoder")
         elif ch == '(':
             decoder = decoderCache.newDecoder("ArrayDecoder")
+        elif ch == '/':
+            decoder = decoderCache.newDecoder("CommentsDecoder")
         elif ch != ' ' and ch != '\r' and ch != '\n' and ch != '\t':
             return
         else:
@@ -519,8 +513,6 @@ class XcodeProjectDecoder:
         self.m_stateStack.push(decoder)
         if decoder.allowGenXPValueBeforeFinish():
             xpValue = decoder.genXPValue(rawText)
-            if None == xpValue:
-                print "Xcode ProjectDecoder Error"
             xpValue.setParent(self.m_curValue)
             if decoder.allowHasChild(rawText):
                 self.m_curValue = xpValue
@@ -554,7 +546,7 @@ class XcodeProjectDecoder:
 
                 self.m_curValue.addChild(xpValue)
         newTopDecoder = self.m_stateStack.top()
-        if None != newTopDecoder:
+        if newTopDecoder is not None:
             newTopDecoder.increaseStatementLenght(statementLength)
         DecoderCache.getInstance().resumeDecoder(topDecoder)
         return

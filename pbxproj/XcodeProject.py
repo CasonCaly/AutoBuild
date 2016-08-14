@@ -29,17 +29,17 @@ class XcodeProject:
 
 def test():
     xcodeProj = None
+    sysstr = platform.system()
     if sysstr == "Darwin":
         xcodeProj = XcodeProject("/Users/Nervecell/Desktop/cocos2d-x-3.8.1/build", "cocos2d_tests")
     else:
         xcodeProj = XcodeProject("F:/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_tests")
+    d1 = datetime.datetime.now()
     project = xcodeProj.parse()
+    d2 = datetime.datetime.now()
+    diff = d2 - d1
+    print diff
 
 if __name__ == "__main__":
-
-    sysstr = platform.system()
-    d1 = datetime.datetime.now()
-    cProfile.run("test()")
-    d2 = datetime.datetime.now()
-    diff = d2-d1
-    print diff
+    test()
+    #cProfile.run("test()")
