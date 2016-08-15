@@ -260,7 +260,11 @@ class StringDecoder(Decoder):
         if ch != '"':
             return ParseResult.PendingParseResult
         else:
-            return ParseResult.FinishParseResult
+            lastCh = rawText[index - 1]
+            if lastCh != '\\':
+                return ParseResult.FinishParseResult
+            else:
+                return ParseResult.PendingParseResult
 
     def genXPValue(self, rawText):
         start = self.m_statementStartIndex
@@ -346,13 +350,28 @@ class AttributeDecoder(Decoder):
             if ch == '=':
                 if (self.m_keyStart == index) or (self.m_valueStart != -1):
                     return ParseResult.error()
+                #  下面步骤剔除空格
                 self.m_keyEnd = index
+                while True:
+                    lastCh = rawText[self.m_keyEnd - 1]  # 闭区间缘故所以要-1
+                    if lastCh == ' ':
+                        self.m_keyEnd -= 1
+                    else:
+                        break
+
                 self.genXPValue(rawText)
                 key = rawText[self.m_keyStart:self.m_keyEnd]
                 self.m_attrValue.setKey(key)
                 self.m_attrValue.addChild(XPString(key))
                 self.m_valueStart = index + 1
             elif ch == ';':
+                while True:
+                    lastCh = rawText[self.m_valueStart]  # 开区间所以是从start开始
+                    if lastCh == ' ':
+                        self.m_valueStart += 1
+                    else:
+                        break
+
                 self.m_valueEnd = index
                 self.genXPValue(rawText)
                 value = rawText[self.m_valueStart:self.m_valueEnd]
@@ -458,6 +477,9 @@ class XcodeProjectDecoder:
         ParseResult.init()
         return
 
+    def getDocument(self):
+        return self.m_document
+
     # 解码器的主人口
     def decode(self, rawString):
         ch = rawString[0]
@@ -492,6 +514,7 @@ class XcodeProjectDecoder:
                 break
 
             index += 1
+
         return
 
     # 自动选择解码器

@@ -21,11 +21,22 @@ class XPValue:
     def setParent(self, xpValue):
         self.m_parent = xpValue
 
+
 class XPDocument(XPValue):
 
     def __init__(self):
         XPValue.__init__(self)
+        self.m_rootValue = None
         return
+
+    def addChild(self, xpValue):
+        XPValue.addChild(self, xpValue)
+        if isinstance(xpValue, XPObject):
+            self.m_rootValue = xpValue
+        return
+
+    def getRootValue(self):
+        return self.m_rootValue
 
 
 class XPComments(XPValue):
@@ -55,10 +66,13 @@ class XPObject(XPValue):
         return
 
     def addValue(self, key, xpValue):
-        self.m_mapAtribute.insert(key, xpValue)
+        self.m_mapAtribute[key] = xpValue
 
     def getValue(self, key):
-        return self.m_mapAtribute.find(key)
+        value = None
+        if self.m_mapAtribute.has_key(key):
+            value = self.m_mapAtribute[key]
+        return value
 
 
 class XPAttribute(XPValue):

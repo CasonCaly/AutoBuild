@@ -3,6 +3,7 @@ class PBXBuildFile:
     def __init__(self):
         return
 
+
 class PBXFileReference:
 
     def __init__(self):
@@ -20,15 +21,18 @@ class PBXGroup:
     def __init__(self):
         return
 
+
 class PBXHeadersBuildPhase:
 
     def __init__(self):
         return
 
+
 class PBXNativeTarget:
 
     def __init__(self):
         return
+
 
 class PBXProject:
 
@@ -47,7 +51,20 @@ class XCBuildConfiguration:
     def __init__(self):
         return
 
+
 class XCConfigurationList:
+
+    def __init__(self):
+        return
+
+
+class PBXAggregateTarget:
+
+    def __init__(self):
+        return
+
+
+class PBXContainerItemProxy:
 
     def __init__(self):
         return
