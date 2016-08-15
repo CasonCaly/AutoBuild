@@ -6,6 +6,8 @@ from XcodeProjectMetas import PBXAggregateTarget
 from XcodeProjectDecoder import XcodeProjectDecoder
 from XPValue import XPObject
 from XPValue import XPAttribute
+from XPValue import XPComments
+
 import platform
 import cProfile
 
@@ -43,13 +45,16 @@ class XcodeProject:
         self.m_objectVersion = rootObject.getValue('objectVersion')
         objects = rootObject.getValue("objects")
 
-        attributes = objects.getAttributes()
-        for value in attributes.values():
-            if isinstance(value, XPObject):
-                typ = value.getValue("isa")
-                if typ.equals("PBXAggregateTarget"):
-                    int = 0
-        #objectsValue = rootObject.getValue("objects")
+        children = objects.getChildren()
+        for childAttr in children:
+            if isinstance(childAttr, XPComments):
+                continue
+            if childAttr.valueIsObject():
+                objValue = childAttr.getValue()
+                type = objValue.getValue("isa")
+                if type.equals("PBXAggregateTarget"):
+                    self.m_PBXAggregateTarget.addItem(childAttr)
+
 
 
     def toString(self):

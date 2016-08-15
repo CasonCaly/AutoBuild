@@ -92,6 +92,12 @@ class XPAttribute(XPValue):
     def getValue(self):
         return self.m_value
 
+    def valueIsObject(self):
+        return isinstance(self.m_value, XPObject)
+
+    def valueIsString(self):
+        return isinstance(self.m_value, XPString)
+
     def setKey(self, key):
         self.m_key = key
 
