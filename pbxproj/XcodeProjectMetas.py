@@ -1,3 +1,6 @@
+from toolkit.List import List
+from toolkit.HashMap import HashMap
+
 class PBXBuildFile:
 
     def __init__(self):
@@ -61,6 +64,10 @@ class XCConfigurationList:
 class PBXAggregateTarget:
 
     def __init__(self):
+        self.m_mapItem = HashMap()
+
+    def addItem(self, attribute):
+
         return
 
 

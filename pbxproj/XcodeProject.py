@@ -1,7 +1,11 @@
 # coding:utf-8
 import os
 import datetime
+from toolkit.List import List
+from XcodeProjectMetas import PBXAggregateTarget
 from XcodeProjectDecoder import XcodeProjectDecoder
+from XPValue import XPObject
+from XPValue import XPAttribute
 import platform
 import cProfile
 
@@ -15,6 +19,8 @@ class XcodeProject:
         self.m_arvhiveVersion = None
         self.m_classes = None
         self.m_objectVersion = None
+
+        self.m_PBXAggregateTarget = PBXAggregateTarget()
 
     def parse(self):
         fullPath = self.m_projectPath + "/" + self.m_projectName + ".xcodeproj/project.pbxproj"
@@ -35,6 +41,16 @@ class XcodeProject:
         self.m_arvhiveVersion = rootObject.getValue('archiveVersion')
         self.m_classes = rootObject.getValue('classes')
         self.m_objectVersion = rootObject.getValue('objectVersion')
+        objects = rootObject.getValue("objects")
+
+        attributes = objects.getAttributes()
+        for value in attributes.values():
+            if isinstance(value, XPObject):
+                typ = value.getValue("isa")
+                if typ.equals("PBXAggregateTarget"):
+                    int = 0
+        #objectsValue = rootObject.getValue("objects")
+
 
     def toString(self):
         return ""

@@ -21,6 +21,8 @@ class XPValue:
     def setParent(self, xpValue):
         self.m_parent = xpValue
 
+    def getChildren(self):
+        return self.m_children
 
 class XPDocument(XPValue):
 
@@ -74,6 +76,8 @@ class XPObject(XPValue):
             value = self.m_mapAtribute[key]
         return value
 
+    def getAttributes(self):
+        return self.m_mapAtribute
 
 class XPAttribute(XPValue):
 
@@ -104,6 +108,12 @@ class XPString(XPValue):
     def __init__(self, str):
         XPValue.__init__(self)
         self.m_string = str
+
+    def equals(self, str):
+        return self.m_string == str
+
+    def getString(self):
+        return self.m_string
 
 class XPArray(XPValue):
 

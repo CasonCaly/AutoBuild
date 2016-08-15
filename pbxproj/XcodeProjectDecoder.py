@@ -323,6 +323,7 @@ class AttributeDecoder(Decoder):
         self.m_keyEnd = -1
         self.m_valueStart = -1
         self.m_valueEnd = -1
+        self.m_valueIsString = True
         return
 
     def parse(self, rawText, ch, index):
@@ -340,8 +341,10 @@ class AttributeDecoder(Decoder):
                 self.m_keyStart = index
             return ParseResult.appendChild("StringDecoder")
         elif ch == '{':
+            self.m_valueIsString = False
             return ParseResult.appendChild("ObjectDecoder")
         elif ch == '(':
+            self.m_valueIsString = False
             return ParseResult.appendChild("ArrayDecoder")
         else:
             if -1 == self.m_keyStart:
@@ -362,9 +365,11 @@ class AttributeDecoder(Decoder):
                 self.genXPValue(rawText)
                 key = rawText[self.m_keyStart:self.m_keyEnd]
                 self.m_attrValue.setKey(key)
-                self.m_attrValue.addChild(XPString(key))
                 self.m_valueStart = index + 1
             elif ch == ';':
+                if not self.m_valueIsString:
+                    return ParseResult.FinishParseResult
+
                 while True:
                     lastCh = rawText[self.m_valueStart]  # 开区间所以是从start开始
                     if lastCh == ' ':
@@ -375,7 +380,6 @@ class AttributeDecoder(Decoder):
                 self.m_valueEnd = index
                 self.genXPValue(rawText)
                 value = rawText[self.m_valueStart:self.m_valueEnd]
-                self.m_attrValue.setValue(value)
                 self.m_attrValue.addChild(XPString(value))
                 return ParseResult.FinishParseResult
 
@@ -388,6 +392,7 @@ class AttributeDecoder(Decoder):
 
     def clean(self):
         Decoder.clean(self)
+        self.m_valueIsString = True
         self.m_attrValue = None
         self.m_keyStart = -1
         self.m_keyEnd = -1
