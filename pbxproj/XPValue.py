@@ -9,6 +9,13 @@ class XPValue:
         self.m_count = 0
         self.m_children = []
         self.m_parent = None
+        self.m_userInfo = None
+
+    def setUserInfo(self, userInfo):
+        self.m_userInfo = userInfo
+
+    def getUserInfo(self):
+        return self.m_userInfo
 
     def addChild(self, xpValue):
         xpValue.m_parent = self
@@ -85,6 +92,8 @@ class XPAttribute(XPValue):
         XPValue.__init__(self)
         self.m_key = None
         self.m_value = None
+        self.m_keyComments = None
+        self.m_valueComments = None
 
     def getKey(self):
         return self.m_key
@@ -107,7 +116,13 @@ class XPAttribute(XPValue):
     def addChild(self, xpValue):
         if not isinstance(xpValue, XPComments):
             self.m_value = xpValue
-        XPValue.addChild(self, xpValue)
+        else:
+            isKeyComments = xpValue.getUserInfo()
+            if isKeyComments:
+                self.m_keyComments = xpValue
+            else:
+                self.m_valueComments = xpValue
+
 
 class XPString(XPValue):
 
@@ -125,13 +140,11 @@ class XPArray(XPValue):
 
     def __init__(self):
         XPValue.__init__(self)
-        self.m_list = List()
+        self.m_list = []
 
-    def insert(self, xpValue):
-        self.m_list.pushBack(xpValue)
-
-    def at(self, index):
-        return self.m_list.at(index)
-
-    def count(self):
-        return self.m_list.count()
+    def addChild(self, xpValue):
+        if not isinstance(xpValue, XPComments):
+            XPValue.addChild(self, xpValue)
+        else:
+            index = xpValue.getUserInfo()
+            self.m_list.insert(index, xpValue)

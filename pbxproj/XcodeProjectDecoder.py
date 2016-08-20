@@ -82,6 +82,7 @@ class ParseResult:
         self.m_nextDecoderName = None
         self.m_newDecoderName = None
         self.m_backNum = 0
+        self.m_userInfo = None
 
     def getState(self):
         return self.m_state
@@ -92,7 +93,9 @@ class ParseResult:
     def genNextDecoder(self):
         if self.m_nextDecoderName is None:
             return None
-        return DecoderCache.getInstance().newDecoder(self.m_nextDecoderName)
+        decoder = DecoderCache.getInstance().newDecoder(self.m_nextDecoderName)
+        decoder.setUserInfo(self.m_userInfo)
+        return decoder
 
     def setBackNum(self, backNum):
         self.m_backNum = backNum
@@ -105,6 +108,7 @@ class ParseResult:
         self.m_nextDecoderName = None
         self.m_newDecoderName = None
         self.m_backNum = 0
+        self.m_userInfo = None
 
     @classmethod
     def init(cls):
@@ -129,17 +133,35 @@ class ParseResult:
         return result
 
     @classmethod
+    def appendCommentsWithUserInfo(cls, userInfo):
+        result = None
+        if ParseResult.s_resultCacheCount == 0:
+            result = ParseResult(ParseResult.AppendChild)
+        else:
+            result = ParseResult.s_resultCache.pop()
+            ParseResult.s_resultCacheCount -= 1
+            result.clean(ParseResult.AppendChild)
+        result.setNextDecoderName("CommentsDecoder")
+        result.m_userInfo = userInfo
+        return result
+
+    @classmethod
     def resumeResult(cls, result):
         ParseResult.s_resultCache.append(result)
         ParseResult.s_resultCacheCount += 1
 
 
 class Decoder:
+
     def __init__(self):
         self.m_isEnd = False
         self.m_statementStartIndex = -1
         self.m_statementLength = 0
+        self.m_userInfo = None
         return
+
+    def setUserInfo(self, userInfo):
+        self.m_userInfo = userInfo
 
     def parseBegin(self, index):
         if self.m_statementStartIndex == -1:
@@ -172,6 +194,7 @@ class Decoder:
         self.m_isEnd = False
         self.m_statementStartIndex = -1
         self.m_statementLength = 0
+        self.m_userInfo = None
         return
 
     def className(self):
@@ -224,12 +247,16 @@ class CommentsDecoder(Decoder):
             start = self.m_statementStartIndex + 2  # 从//之后开始所以是要加2
             end = self.m_statementStartIndex + self.m_statementLength - 1  # 去掉\n
             comments = rawText[start:end]
-            return XPComments(True, comments)
+            xpComments = XPComments(True, comments)
+            xpComments.setUserInfo(self.m_userInfo)
+            return xpComments
         else:
             start = self.m_statementStartIndex + 2  # // /*
             end = self.m_statementStartIndex + self.m_statementLength
             comments = rawText[start:end]
-            return XPComments(False, comments)
+            xpComments = XPComments(False, comments)
+            xpComments.setUserInfo(self.m_userInfo)
+            return xpComments
 
     def clean(self):
         Decoder.clean(self)
@@ -335,7 +362,15 @@ class AttributeDecoder(Decoder):
             if nextCh != '/' and nextCh != '*':
                 return ParseResult.PendingParseResult
             else:
-                return ParseResult.appendChild("CommentsDecoder")
+                isKeyComments = True
+                if self.m_keyStart != -1 and self.m_keyEnd == -1:
+                    self.m_keyEnd = index
+                else:
+                    if self.m_valueEnd == -1:
+                        self.m_valueEnd = index
+                    isKeyComments = False
+
+                return ParseResult.appendCommentsWithUserInfo(isKeyComments)
         elif ch == '"':
             if -1 == self.m_keyStart:
                 self.m_keyStart = index
@@ -354,7 +389,8 @@ class AttributeDecoder(Decoder):
                 if (self.m_keyStart == index) or (self.m_valueStart != -1):
                     return ParseResult.error()
                 #  下面步骤剔除空格
-                self.m_keyEnd = index
+                if self.m_keyEnd == -1:
+                    self.m_keyEnd = index
                 while True:
                     lastCh = rawText[self.m_keyEnd - 1]  # 闭区间缘故所以要-1
                     if lastCh == ' ':
@@ -370,6 +406,9 @@ class AttributeDecoder(Decoder):
                 if not self.m_valueIsString:
                     return ParseResult.FinishParseResult
 
+                if self.m_valueEnd == -1:
+                    self.m_valueEnd = index
+
                 while True:
                     lastCh = rawText[self.m_valueStart]  # 开区间所以是从start开始
                     if lastCh == ' ':
@@ -377,7 +416,13 @@ class AttributeDecoder(Decoder):
                     else:
                         break
 
-                self.m_valueEnd = index
+                while True:
+                    lastCh = rawText[self.m_valueEnd - 1]  # 闭区间所以是从end-1开始
+                    if lastCh == ' ':
+                        self.m_valueEnd -= 1
+                    else:
+                        break
+
                 self.genXPValue(rawText)
                 value = rawText[self.m_valueStart:self.m_valueEnd]
                 self.m_attrValue.addChild(XPString(value))
@@ -416,6 +461,7 @@ class ArrayDecoder(Decoder):
         self.m_nextValueBegin = -1
         self.m_nextValueLength = 0
         self.m_valueWithQuotation = False  # 数组的值是否有引号
+        self.m_index = 0
         return
 
     def parse(self, rawText, ch, index):
@@ -425,7 +471,7 @@ class ArrayDecoder(Decoder):
         if ch == '/':
             nextCh = rawText[index + 1]
             if nextCh == '/' or nextCh == '*':
-                return ParseResult.appendChild("CommentsDecoder")
+                return ParseResult.appendCommentsWithUserInfo(self.m_index) # appendChild("CommentsDecoder")
             else:
                 if -1 != self.m_nextValueBegin:
                     self.m_nextValueLength += 1
@@ -438,6 +484,7 @@ class ArrayDecoder(Decoder):
                 self.genXPValue(rawText)
                 self.m_arrValue.addChild(XPString(strValue))
             self.cleanValueInfo()
+            self.m_index += 1
             return ParseResult.PendingParseResult
         elif ch == ')':
             return ParseResult.FinishParseResult
@@ -462,6 +509,7 @@ class ArrayDecoder(Decoder):
         Decoder.clean(self)
         self.cleanValueInfo()
         self.m_arrValue = None
+        self.m_index = 0
         return
 
     def className(self):

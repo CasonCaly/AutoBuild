@@ -67,7 +67,7 @@ class XcodeProject:
 def test():
     sysstr = platform.system()
     if sysstr == "Darwin":
-        xcodeProj = XcodeProject("/Users/Nervecell/Desktop/cocos2d-x-3.8.1/build", "cocos2d_libs")
+        xcodeProj = XcodeProject("/Users/Nervecell/Desktop/cocos2d-x-3.8.1/build", "cocos2d_tests")
     else:
         xcodeProj = XcodeProject("F:/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_tests")
     d1 = datetime.datetime.now()
