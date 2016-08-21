@@ -1,15 +1,16 @@
 # coding:utf-8
 import os
 import datetime
-from toolkit.List import List
+import platform
+import cProfile
+
+
 from XcodeProjectMetas import PBXAggregateTarget
 from XcodeProjectDecoder import XcodeProjectDecoder
 from XPValue import XPObject
 from XPValue import XPAttribute
 from XPValue import XPComments
-
-import platform
-import cProfile
+from cStringIO import StringIO
 
 class XcodeProject:
 
@@ -55,13 +56,16 @@ class XcodeProject:
                 if type.equals("PBXAggregateTarget"):
                     self.m_PBXAggregateTarget.addItem(childAttr)
 
-
-
     def toString(self):
         return ""
 
-    def writeToFile(self, path):
-
+    def writeToFile(self, path, name):
+        fullPath = path + "/" + name + "project.pbxproj"
+        stringIO = StringIO()
+        self.m_xpDocument.genStream(stringIO, 0)
+        fo = open(fullPath, "wb")
+        fo.write(stringIO.getvalue())
+        fo.close()
         return
 
 def test():
@@ -75,6 +79,8 @@ def test():
     d2 = datetime.datetime.now()
     diff = d2 - d1
     print diff
+
+    xcodeProj.writeToFile("/Users/Nervecell/Desktop", "")
 
 if __name__ == "__main__":
     test()

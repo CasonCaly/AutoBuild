@@ -1,7 +1,5 @@
 # coding:utf-8
 
-from toolkit.List import List
-from toolkit.HashMap import HashMap
 
 class XPValue:
 
@@ -31,6 +29,9 @@ class XPValue:
     def getChildren(self):
         return self.m_children
 
+    def genStream(self, ioStream, floor):
+        return
+
 class XPDocument(XPValue):
 
     def __init__(self):
@@ -47,6 +48,10 @@ class XPDocument(XPValue):
     def getRootValue(self):
         return self.m_rootValue
 
+    def genStream(self, ioStream, floor):
+        for xpValue in self.m_children:
+            xpValue.genStream(ioStream, 0)
+        return
 
 class XPComments(XPValue):
 
@@ -61,6 +66,16 @@ class XPComments(XPValue):
     def getCommnets(self):
         return self.m_comments
 
+    def genStream(self, ioStream, floor):
+        if self.m_isLine:
+            ioStream.write("//")
+            ioStream.write(self.m_comments)
+            ioStream.write("\n")
+        else:
+            ioStream.write(" /*")
+            ioStream.write(self.m_comments)
+            ioStream.write("*/ ")
+        return
 
 class XPObject(XPValue):
 
@@ -85,6 +100,23 @@ class XPObject(XPValue):
 
     def getAttributes(self):
         return self.m_mapAtribute
+
+    def genStream(self, ioStream, floor):
+        selfFloor = floor + 1
+        ioStream.write("{\n")
+
+        for xpValue in self.m_children:
+            isComments = isinstance(xpValue, XPComments)
+            if isComments:
+                ioStream.write("\n")
+            xpValue.genStream(ioStream, selfFloor)
+            if isComments:
+                ioStream.write("\n")
+
+        for num in range(0, floor):
+            ioStream.write("\t")
+        ioStream.write("}")
+        return
 
 class XPAttribute(XPValue):
 
@@ -123,6 +155,22 @@ class XPAttribute(XPValue):
             else:
                 self.m_valueComments = xpValue
 
+    def genStream(self, ioStream, floor):
+        selfFloor = floor + 1
+        for num in range(0, floor):
+            ioStream.write("\t")
+
+        ioStream.write(self.m_key)
+        if self.m_keyComments is not None:
+            self.m_keyComments.genStream(ioStream, floor)
+
+        ioStream.write(" = ")
+        self.m_value.genStream(ioStream, floor)
+        if self.m_valueComments is not None:
+            self.m_valueComments.genStream(ioStream, floor)
+
+        ioStream.write(";\n")
+        return
 
 class XPString(XPValue):
 
@@ -136,15 +184,43 @@ class XPString(XPValue):
     def getString(self):
         return self.m_string
 
+    def genStream(self, ioStream, floor):
+        ioStream.write(self.m_string)
+        return
+
 class XPArray(XPValue):
 
     def __init__(self):
         XPValue.__init__(self)
-        self.m_list = []
+        self.m_map = {}
 
     def addChild(self, xpValue):
         if not isinstance(xpValue, XPComments):
             XPValue.addChild(self, xpValue)
         else:
             index = xpValue.getUserInfo()
-            self.m_list.insert(index, xpValue)
+            self.m_map[index] = xpValue  # .insert(index, xpValue)
+
+    def genStream(self, ioStream, floor):
+        selfFloor = floor + 1
+        strTabs = ""
+
+        for num in range(0, selfFloor):
+            strTabs += "\t"
+
+        count = len(self.m_children) - 1
+        ioStream.write("(\n")
+        for index in range(0, count):
+            xpValue = self.m_children[index]
+            ioStream.write(strTabs)
+            xpValue.genStream(ioStream, selfFloor)
+            if self.m_map.has_key(index):
+                xpComment = self.m_map[index]
+                xpComment.genStream(ioStream, selfFloor)
+
+            ioStream.write(",\n")
+
+        strTabsForClose = strTabs[0:floor]
+        ioStream.write(strTabsForClose)
+        ioStream.write(")")
+        return

@@ -1,6 +1,5 @@
 # coding:utf-8
 
-from toolkit.HashMap import HashMap
 from XPValue import XPDocument
 from XPValue import XPComments
 from XPValue import XPObject
@@ -252,7 +251,7 @@ class CommentsDecoder(Decoder):
             return xpComments
         else:
             start = self.m_statementStartIndex + 2  # // /*
-            end = self.m_statementStartIndex + self.m_statementLength
+            end = self.m_statementStartIndex + self.m_statementLength -2
             comments = rawText[start:end]
             xpComments = XPComments(False, comments)
             xpComments.setUserInfo(self.m_userInfo)
