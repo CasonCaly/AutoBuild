@@ -55,6 +55,14 @@ class XcodeProject:
                 type = objValue.getValue("isa")
                 if type.equals("PBXAggregateTarget"):
                     self.m_PBXAggregateTarget.addItem(childAttr)
+                elif type.equals("XCBuildConfiguration"):
+                    self.parseXCBuildConfiguration()
+
+    def parsePBXAggregateTarget(self):
+        return
+
+    def parseXCBuildConfiguration(self):
+        return
 
     def toString(self):
         return ""

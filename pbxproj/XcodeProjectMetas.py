@@ -51,7 +51,8 @@ class PBXSourcesBuildPhase:
 
 class XCBuildConfiguration:
 
-    def __init__(self):
+    def __init__(self, xpObject):
+        self.m_buildConfiguration = xpObject
         return
 
 
