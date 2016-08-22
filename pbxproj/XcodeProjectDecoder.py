@@ -454,12 +454,13 @@ class AttributeDecoder(Decoder):
 
 
 class ArrayDecoder(Decoder):
+
     def __init__(self):
         Decoder.__init__(self)
         self.m_arrValue = None
         self.m_nextValueBegin = -1
         self.m_nextValueLength = 0
-        self.m_valueWithQuotation = False  # 数组的值是否有引号
+        self.m_isNormalString = True
         self.m_index = 0
         return
 
@@ -470,23 +471,27 @@ class ArrayDecoder(Decoder):
         if ch == '/':
             nextCh = rawText[index + 1]
             if nextCh == '/' or nextCh == '*':
-                return ParseResult.appendCommentsWithUserInfo(self.m_index) # appendChild("CommentsDecoder")
+                return ParseResult.appendCommentsWithUserInfo(self.m_index)  # appendChild("CommentsDecoder")
             else:
                 if -1 != self.m_nextValueBegin:
                     self.m_nextValueLength += 1
         elif ch == '"':
-            self.m_valueWithQuotation = True
+            self.m_isNormalString = False
             return ParseResult.appendChild("StringDecoder")
         elif ch == ',':
-            if not self.m_valueWithQuotation:  # 如果有引号的话不需要处理StringDecoder会自动把值加入到XPArray中
+            if self.m_isNormalString:  # 普通字符串处理
                 strValue = rawText[self.m_nextValueBegin:self.m_nextValueBegin + self.m_nextValueLength]
                 self.genXPValue(rawText)
                 self.m_arrValue.addChild(XPString(strValue))
+
             self.cleanValueInfo()
             self.m_index += 1
             return ParseResult.PendingParseResult
         elif ch == ')':
             return ParseResult.FinishParseResult
+        elif ch == '{':
+            self.m_isNormalString = False
+            return ParseResult.appendChild("ObjectDecoder")
         else:
             if 0 != self.m_statementLength:
                 if -1 == self.m_nextValueBegin:
@@ -501,7 +506,7 @@ class ArrayDecoder(Decoder):
 
     def cleanValueInfo(self):
         self.m_nextValueBegin = -1
-        self.m_valueWithQuotation = False
+        self.m_isNormalString = True
         self.m_nextValueLength = 0
 
     def clean(self):
@@ -509,6 +514,7 @@ class ArrayDecoder(Decoder):
         self.cleanValueInfo()
         self.m_arrValue = None
         self.m_index = 0
+        self.m_isNormalString = True
         return
 
     def className(self):
