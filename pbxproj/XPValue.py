@@ -94,7 +94,7 @@ class XPObject(XPValue):
 
     def getValue(self, key):
         value = None
-        if self.m_mapAtribute.has_key(key):
+        if key in self.m_mapAtribute:
             value = self.m_mapAtribute[key]
         return value
 
@@ -231,6 +231,9 @@ class XPString(XPValue):
 
     def getString(self):
         return self.m_string
+
+    def setString(self, newStr):
+        self.m_string = newStr
 
     def genStream(self, ioStream, floor):
         ioStream.write(self.m_string)

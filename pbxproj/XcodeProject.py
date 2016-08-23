@@ -2,15 +2,13 @@
 import os
 import datetime
 import platform
-import cProfile
+# import cProfile
 
 
-from XcodeProjectMetas import PBXAggregateTarget
+from XcodeProjectMetas import PBXProject
 from XcodeProjectDecoder import XcodeProjectDecoder
-from XPValue import XPObject
-from XPValue import XPAttribute
-from XPValue import XPComments
 from cStringIO import StringIO
+
 
 class XcodeProject:
 
@@ -19,53 +17,40 @@ class XcodeProject:
         self.m_projectName = projectName
 
         self.m_xpDocument = None
-        self.m_arvhiveVersion = None
+        self.m_archiveVersion = None
         self.m_classes = None
         self.m_objectVersion = None
 
-        self.m_PBXAggregateTarget = PBXAggregateTarget()
+        self.m_PBXProject = PBXProject()
 
     def parse(self):
         fullPath = self.m_projectPath + "/" + self.m_projectName + ".xcodeproj/project.pbxproj"
         if not os.path.exists(fullPath):
             return False
 
-        file = open(fullPath)
-        allText = file.read()
+        targetFile = open(fullPath)
+        allText = targetFile.read()
         project = XcodeProjectDecoder()
         project.decode(allText)
-
+        targetFile.close()
         self.m_xpDocument = project.getDocument()
         self.parseMetaData()
         return True
 
     def parseMetaData(self):
         rootObject = self.m_xpDocument.getRootValue()
-        self.m_arvhiveVersion = rootObject.getValue('archiveVersion')
+        self.m_archiveVersion = rootObject.getValue('archiveVersion')
         self.m_classes = rootObject.getValue('classes')
         self.m_objectVersion = rootObject.getValue('objectVersion')
+
+        rootObjectId = rootObject.getValue("rootObject")
+
         objects = rootObject.getValue("objects")
+        pbxProjectValue = objects.getValue(rootObjectId.getString())
+        self.m_PBXProject.init(pbxProjectValue, objects)
 
-        children = objects.getChildren()
-        for childAttr in children:
-            if isinstance(childAttr, XPComments):
-                continue
-            if childAttr.valueIsObject():
-                objValue = childAttr.getValue()
-                type = objValue.getValue("isa")
-                if type.equals("PBXAggregateTarget"):
-                    self.m_PBXAggregateTarget.addItem(childAttr)
-                elif type.equals("XCBuildConfiguration"):
-                    self.parseXCBuildConfiguration()
-
-    def parsePBXAggregateTarget(self):
-        return
-
-    def parseXCBuildConfiguration(self):
-        return
-
-    def toString(self):
-        return ""
+    def getPBXProject(self):
+        return self.m_PBXProject
 
     def writeToFile(self, path, name):
         fullPath = path + "/" + name + "project.pbxproj"
@@ -76,6 +61,7 @@ class XcodeProject:
         fo.close()
         return
 
+
 def test():
     sysstr = platform.system()
     if sysstr == "Darwin":
@@ -83,7 +69,7 @@ def test():
     else:
         xcodeProj = XcodeProject("F:/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_libs")
     d1 = datetime.datetime.now()
-    project = xcodeProj.parse()
+    xcodeProj.parse()
     d2 = datetime.datetime.now()
     diff = d2 - d1
     print diff
@@ -91,8 +77,22 @@ def test():
     if sysstr == "Darwin":
         xcodeProj.writeToFile("/Users/Nervecell/Desktop", "libs")
     else:
+        pbxProject = xcodeProj.getPBXProject()
+
+        pbxNativeTarget = pbxProject.getTarget("libcocos2d iOS")
+        xcConfigurationList = pbxNativeTarget.getXCConfigurationList()
+        xcBuildConfiguration = xcConfigurationList.getBuildConfiguration("Release")
+        buildSettings = xcBuildConfiguration.getBuildSettings()
+
+        isSuceess = buildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "\"COCOS2D_DEBUG=1\"")
+        if not isSuceess:
+            defaultXCConfigurationList = pbxProject.getXCConfigurationList()
+            defaultXCBuildConfiguration = defaultXCConfigurationList.getBuildConfiguration("Release")
+            defaultBuildSettings = defaultXCBuildConfiguration.getBuildSettings()
+            defaultBuildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "\"COCOS2D_DEBUG=1\"")
+
         xcodeProj.writeToFile("F:\\", "")
 
 if __name__ == "__main__":
     test()
-    #cProfile.run("test()")
+    # cProfile.run("test()")
