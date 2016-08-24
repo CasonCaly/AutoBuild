@@ -13,14 +13,22 @@ class Process:
     # 静态函数，传入命令
     @classmethod
     def execute(cls, command):
-        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while True:
             out = process.stdout.readline()
-            if out == "" and process.poll() != None:
+            err = process.stderr
+            if err is not None:
+                errOut = err.readline()
+                sys.stdout.write(errOut)
+                sys.stdout.flush()
+
+            if out == "" and process.poll() is not None:
                 break
             if out != "":
                 sys.stdout.write(out)
                 sys.stdout.flush()
+
+
         return
 
 
