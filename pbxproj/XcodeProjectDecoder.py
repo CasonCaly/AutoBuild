@@ -121,7 +121,6 @@ class ParseResult:
 
     @classmethod
     def appendChild(cls, nextDecoderName):
-        result = None
         if ParseResult.s_resultCacheCount == 0:
             result = ParseResult(ParseResult.AppendChild)
         else:
@@ -133,7 +132,6 @@ class ParseResult:
 
     @classmethod
     def appendCommentsWithUserInfo(cls, userInfo):
-        result = None
         if ParseResult.s_resultCacheCount == 0:
             result = ParseResult(ParseResult.AppendChild)
         else:
@@ -274,8 +272,6 @@ class CommentsDecoder(Decoder):
 
 class StringDecoder(Decoder):
 
-    # allocCount = 1
-
     def __init__(self):
         Decoder.__init__(self)
         return
@@ -311,6 +307,7 @@ class StringDecoder(Decoder):
 
 
 class ObjectDecoder(Decoder):
+
     def __init__(self):
         Decoder.__init__(self)
         return
@@ -342,6 +339,7 @@ class ObjectDecoder(Decoder):
 
 
 class AttributeDecoder(Decoder):
+
     def __init__(self):
         Decoder.__init__(self)
         self.m_attrValue = None
@@ -572,13 +570,11 @@ class XcodeProjectDecoder:
                 break
 
             index += 1
-
         return
 
     # 自动选择解码器
     def autoSelect(self, rawText, ch):
         decoderCache = DecoderCache.getInstance()
-        decoder = None
 
         if ch == '{':
             decoder = decoderCache.newDecoder("ObjectDecoder")

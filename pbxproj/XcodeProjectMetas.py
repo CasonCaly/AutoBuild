@@ -73,6 +73,13 @@ class BuildSettings:
         if self.m_GCC_PREPROCESSOR_DEFINITIONSArray is None:
             return False
 
+        for ch in newDefine:
+            if (ch >='a' and ch <= 'z') or (ch >= 'A' and ch <='Z') or (ch >= '0' and ch <='9') or ch == '_':
+                continue
+            else:
+                newDefine = "\"" + newDefine + "\""
+                break
+
         children = self.m_GCC_PREPROCESSOR_DEFINITIONSArray.getChildren()
         for child in children:
             if child.equals(oldDefine):

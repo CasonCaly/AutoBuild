@@ -1,11 +1,10 @@
 # coding: UTF-8
-
-import subprocess
+import os
 from toolkit.Process import Process
 from pbxproj.XcodeProject import XcodeProject
 
-class CocosIOSLibBuilder:
 
+class CocosIOSLibBuilder:
     def __init__(self, projectPath, projectName, target):
         self.m_projectPath = projectPath
         self.m_projectName = projectName
@@ -30,6 +29,32 @@ class CocosIOSLibBuilder:
         return target
 
     def buildDebugDevice(self):
+        self.backupFile()
+
+        xcodeProj = XcodeProject(self.m_projectPath, self.m_projectName)
+        xcodeProj.parse()
+        pbxProject = xcodeProj.getPBXProject()
+
+        pbxNativeTarget = pbxProject.getTarget(self.m_target)
+        xcConfigurationList = pbxNativeTarget.getXCConfigurationList()
+        xcBuildConfiguration = xcConfigurationList.getBuildConfiguration("Release")
+        buildSettings = xcBuildConfiguration.getBuildSettings()
+        isSuccess = buildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "COCOS2D_DEBUG=1")
+
+        if not isSuccess:
+            defaultXCConfigurationList = pbxProject.getXCConfigurationList()
+            defaultXCBuildConfiguration = defaultXCConfigurationList.getBuildConfiguration("Release")
+            defaultBuildSettings = defaultXCBuildConfiguration.getBuildSettings()
+            isSuccess = defaultBuildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "COCOS2D_DEBUG=1")
+            if not isSuccess:
+                print "Can not find GCC_PREPROCESSOR_DEFINITIONS NDEBUG"
+        xcodeProj.writeToFile(self.fullProjectPath(), "")
+        self.buildReleaseDevice()
+        self.resumeFile()
+
+    #def replaceWith
+
+    def backupFile(self):
         srcFullPath = self.fullProjectPath()
         srcFullPath += "/project.pbxproj"
 
@@ -41,40 +66,29 @@ class CocosIOSLibBuilder:
         destFile = open(destFullPath, "wb")
         destFile.write(allText)
         destFile.close()
+        return allText
 
-        xcodeProj = XcodeProject(self.m_projectPath, self.m_projectName)
-        xcodeProj.parse()
-        pbxProject = xcodeProj.getPBXProject()
+    def resumeFile(self):
+        # 移除被修改的文件
+        destFullPath = self.fullProjectPath()
+        destFullPath += "/project.pbxproj"
+        if os.path.exist(destFullPath):
+            os.remove(destFullPath)
 
-        pbxNativeTarget = pbxProject.getTarget(self.m_target)
-        xcConfigurationList = pbxNativeTarget.getXCConfigurationList()
-        xcBuildConfiguration = xcConfigurationList.getBuildConfiguration("Release")
-        buildSettings = xcBuildConfiguration.getBuildSettings()
-
-        isSuceess = buildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "\"COCOS2D_DEBUG=1\"")
-        if not isSuceess:
-            defaultXCConfigurationList = pbxProject.getXCConfigurationList()
-            defaultXCBuildConfiguration = defaultXCConfigurationList.getBuildConfiguration("Release")
-            defaultBuildSettings = defaultXCBuildConfiguration.getBuildSettings()
-            defaultBuildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "\"COCOS2D_DEBUG=1\"")
-        xcodeProj.writeToFile(self.fullProjectPath(), "")
-        self.buildReleaseDevice()
+        # 将project.pbxproj.backup文件重命名为project.pbxproj
+        srcFullPath = self.fullProjectPath()
+        srcFullPath += "/project.pbxproj.backup"
+        os.rename(srcFullPath, destFullPath)
 
     def useLipo(self):
         simulatorOutPath = self.fullOutPath(True)
         deviceOutPath = self.fullOutPath(False)
-        lipoPath = self.fullPathInProject("build/lipo/"+self.m_target+".a")
+        lipoPath = self.fullPathInProject("build/lipo/" + self.m_target + ".a")
         command = "lipo -create " + simulatorOutPath + " " + deviceOutPath + " -output " + lipoPath
-        print command
-        p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        output = p.communicate()
-        print output[0]
+        Process.execute(command)
 
     def useXcodeBuild(self, command):
         Process.execute(command)
-        # p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        # output = p.communicate()
-        # print output[0]
 
     def fullProjectPath(self):
         fullPath = self.fullPathInProject(self.m_projectName)
@@ -99,8 +113,9 @@ class CocosIOSLibBuilder:
         return fullPath + subPath + ".xcodeproj"
 
 
-
-builder = CocosIOSLibBuilder("/Users/nervecell/workspaces/boyi_all_client/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_libs", "libcocos2d iOS")
-# builder.buildSimulator()
+builder = CocosIOSLibBuilder(
+    "/Users/nervecell/workspaces/boyi_all_client/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_libs",
+    "libcocos2d iOS")
+builder.buildSimulator()
 builder.buildDebugDevice()
 builder.useLipo()
