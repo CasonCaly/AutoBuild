@@ -1,5 +1,6 @@
 from toolkit.HashMap import HashMap
-
+from pbxproj.XPValue import XPAttribute
+from pbxproj.XPValue import XPString
 
 class PBXBuildFile:
 
@@ -73,13 +74,7 @@ class BuildSettings:
         if self.m_GCC_PREPROCESSOR_DEFINITIONSArray is None:
             return False
 
-        for ch in newDefine:
-            if (ch >='a' and ch <= 'z') or (ch >= 'A' and ch <='Z') or (ch >= '0' and ch <='9') or ch == '_':
-                continue
-            else:
-                newDefine = "\"" + newDefine + "\""
-                break
-
+        newDefine = self.autoWithQuotation(newDefine)
         children = self.m_GCC_PREPROCESSOR_DEFINITIONSArray.getChildren()
         for child in children:
             if child.equals(oldDefine):
@@ -87,6 +82,31 @@ class BuildSettings:
                 return True
 
         return False
+
+    def replaceVALID_ARCHS(self, newDefine):
+        newDefine = self.autoWithQuotation(newDefine)
+        VALID_ARCHSString = self.m_buildSettingsObject.getValue("VALID_ARCHS")
+        if VALID_ARCHSString is None:
+            VALID_ARCHAttr = XPAttribute()
+            VALID_ARCHAttr.setKey("VALID_ARCHS")
+            value = XPString(newDefine)
+            VALID_ARCHAttr.addChild(value)
+            self.m_buildSettingsObject.addChild(VALID_ARCHAttr)
+            return
+
+        VALID_ARCHSString.setString(newDefine)
+        return
+
+    def autoWithQuotation(self, define):
+        for ch in define:
+            if (ch >='a' and ch <= 'z') or (ch >= 'A' and ch <='Z') or (ch >= '0' and ch <='9') or ch == '_':
+                continue
+            else:
+                define = "\"" + define + "\""
+                break
+        return define
+
+
 
 
 class XCBuildConfiguration:

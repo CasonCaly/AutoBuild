@@ -12,19 +12,36 @@ from cStringIO import StringIO
 
 class XcodeProject:
 
+    Release = "Release"
+    Debug = "Debug"
+
     def __init__(self, projectPath, projectName):
         self.m_projectPath = projectPath
         self.m_projectName = projectName
+        self.m_fullPath = None
 
         self.m_xpDocument = None
         self.m_archiveVersion = None
         self.m_classes = None
         self.m_objectVersion = None
-
         self.m_PBXProject = PBXProject()
+        self.m_target = None
+
+    def initWithFullPath(self, fullPath):
+        self.m_fullPath = fullPath
+
+    def setTarget(self, target):
+        self.m_target = target
+
+    def getTarget(self):
+        return self.m_target
 
     def parse(self):
-        fullPath = self.m_projectPath + "/" + self.m_projectName + ".xcodeproj/project.pbxproj"
+        if self.m_fullPath is None:
+            fullPath = self.m_projectPath + "/" + self.m_projectName + ".xcodeproj/project.pbxproj"
+        else:
+            fullPath = self.m_fullPath + ".xcodeproj/project.pbxproj"
+
         if not os.path.exists(fullPath):
             return False
 
@@ -52,6 +69,19 @@ class XcodeProject:
     def getPBXProject(self):
         return self.m_PBXProject
 
+    def getBuildSettings(self, target, configuartion):
+        pbxNativeTarget = self.m_PBXProject.getTarget(target)
+        xcConfigurationList = pbxNativeTarget.getXCConfigurationList()
+        xcBuildConfiguration = xcConfigurationList.getBuildConfiguration(configuartion)
+        buildSettings = xcBuildConfiguration.getBuildSettings()
+        return buildSettings
+
+    def getDefaultBuildSettings(self, configuartion):
+        defaultXCConfigurationList = self.m_PBXProject.getXCConfigurationList()
+        defaultXCBuildConfiguration = defaultXCConfigurationList.getBuildConfiguration(configuartion)
+        defaultBuildSettings = defaultXCBuildConfiguration.getBuildSettings()
+        return defaultBuildSettings
+
     def writeToFile(self, path, name):
         fullPath = path + "/" + name + "project.pbxproj"
         stringIO = StringIO()
@@ -61,6 +91,17 @@ class XcodeProject:
         fo.close()
         return
 
+    def writeDefalt(self):
+        if self.m_fullPath is None:
+            fullPath = self.m_projectPath + "/" + self.m_projectName + ".xcodeproj/project.pbxproj"
+        else:
+            fullPath = self.m_fullPath + ".xcodeproj/project.pbxproj"
+
+        stringIO = StringIO()
+        self.m_xpDocument.genStream(stringIO, 0)
+        fo = open(fullPath, "wb")
+        fo.write(stringIO.getvalue())
+        fo.close()
 
 def test():
     sysstr = platform.system()

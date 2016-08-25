@@ -5,6 +5,7 @@ from pbxproj.XcodeProject import XcodeProject
 
 
 class CocosIOSLibBuilder:
+
     def __init__(self, projectPath, projectName, target, prebuiltPath):
         self.m_projectPath = projectPath
         self.m_projectName = projectName
@@ -52,17 +53,11 @@ class CocosIOSLibBuilder:
         xcodeProj = XcodeProject(self.m_projectPath, self.m_projectName)
         xcodeProj.parse()
         pbxProject = xcodeProj.getPBXProject()
-
-        pbxNativeTarget = pbxProject.getTarget(self.m_target)
-        xcConfigurationList = pbxNativeTarget.getXCConfigurationList()
-        xcBuildConfiguration = xcConfigurationList.getBuildConfiguration("Release")
-        buildSettings = xcBuildConfiguration.getBuildSettings()
+        buildSettings = pbxProject.getBuildSettings(self.m_target, "Release")
         isSuccess = buildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "COCOS2D_DEBUG=1")
 
         if not isSuccess:
-            defaultXCConfigurationList = pbxProject.getXCConfigurationList()
-            defaultXCBuildConfiguration = defaultXCConfigurationList.getBuildConfiguration("Release")
-            defaultBuildSettings = defaultXCBuildConfiguration.getBuildSettings()
+            defaultBuildSettings = xcodeProj.getDefaultBuildSettings("Release")
             isSuccess = defaultBuildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "COCOS2D_DEBUG=1")
             if not isSuccess:
                 print "Can not find GCC_PREPROCESSOR_DEFINITIONS NDEBUG"
@@ -144,7 +139,7 @@ class CocosIOSLibBuilder:
         return fullPath + subPath + ".xcodeproj"
 
 
-builder = CocosIOSLibBuilder("/Users/nervecell/workspaces/boyi_all_client/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_libs", "libcocos2d iOS", "/Users/nervecell/workspaces/boyi_all_client/common/client/frameworks/prebuilt/build/iOS")
+# builder = CocosIOSLibBuilder("/Users/nervecell/workspaces/boyi_all_client/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_libs", "libcocos2d iOS", "/Users/nervecell/workspaces/boyi_all_client/common/client/frameworks/prebuilt/build/iOS")
 # builder.buildSimulator()
 # builder.buildDebug()
 # builder.lipoDebugLib()
