@@ -38,7 +38,8 @@ class XcodeProject:
 
     def parse(self):
         if self.m_fullPath is None:
-            fullPath = self.m_projectPath + "/" + self.m_projectName + ".xcodeproj/project.pbxproj"
+            fullPath = self.m_projectPath + "/" + \
+                self.m_projectName + ".xcodeproj/project.pbxproj"
         else:
             fullPath = self.m_fullPath + ".xcodeproj/project.pbxproj"
 
@@ -72,13 +73,15 @@ class XcodeProject:
     def getBuildSettings(self, target, configuartion):
         pbxNativeTarget = self.m_PBXProject.getTarget(target)
         xcConfigurationList = pbxNativeTarget.getXCConfigurationList()
-        xcBuildConfiguration = xcConfigurationList.getBuildConfiguration(configuartion)
+        xcBuildConfiguration = xcConfigurationList.getBuildConfiguration(
+            configuartion)
         buildSettings = xcBuildConfiguration.getBuildSettings()
         return buildSettings
 
     def getDefaultBuildSettings(self, configuartion):
         defaultXCConfigurationList = self.m_PBXProject.getXCConfigurationList()
-        defaultXCBuildConfiguration = defaultXCConfigurationList.getBuildConfiguration(configuartion)
+        defaultXCBuildConfiguration = defaultXCConfigurationList.getBuildConfiguration(
+            configuartion)
         defaultBuildSettings = defaultXCBuildConfiguration.getBuildSettings()
         return defaultBuildSettings
 
@@ -93,7 +96,8 @@ class XcodeProject:
 
     def writeDefalt(self):
         if self.m_fullPath is None:
-            fullPath = self.m_projectPath + "/" + self.m_projectName + ".xcodeproj/project.pbxproj"
+            fullPath = self.m_projectPath + "/" + \
+                self.m_projectName + ".xcodeproj/project.pbxproj"
         else:
             fullPath = self.m_fullPath + ".xcodeproj/project.pbxproj"
 
@@ -103,12 +107,15 @@ class XcodeProject:
         fo.write(stringIO.getvalue())
         fo.close()
 
+
 def test():
     sysstr = platform.system()
     if sysstr == "Darwin":
-        xcodeProj = XcodeProject("/Users/Nervecell/Desktop/cocos2d-x-3.8.1/build", "cocos2d_libs")
+        xcodeProj = XcodeProject(
+            "/Users/Nervecell/Desktop/cocos2d-x-3.8.1/build", "cocos2d_libs")
     else:
-        xcodeProj = XcodeProject("F:/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_libs")
+        xcodeProj = XcodeProject(
+            "F:/common/client/frameworks/cocos2d-x-3.8.1/build", "cocos2d_libs")
     d1 = datetime.datetime.now()
     xcodeProj.parse()
     d2 = datetime.datetime.now()
@@ -122,15 +129,19 @@ def test():
 
         pbxNativeTarget = pbxProject.getTarget("libcocos2d iOS")
         xcConfigurationList = pbxNativeTarget.getXCConfigurationList()
-        xcBuildConfiguration = xcConfigurationList.getBuildConfiguration("Release")
+        xcBuildConfiguration = xcConfigurationList.getBuildConfiguration(
+            "Release")
         buildSettings = xcBuildConfiguration.getBuildSettings()
 
-        isSuceess = buildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "\"COCOS2D_DEBUG=1\"")
+        isSuceess = buildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS(
+            "NDEBUG", "\"COCOS2D_DEBUG=1\"")
         if not isSuceess:
             defaultXCConfigurationList = pbxProject.getXCConfigurationList()
-            defaultXCBuildConfiguration = defaultXCConfigurationList.getBuildConfiguration("Release")
+            defaultXCBuildConfiguration = defaultXCConfigurationList.getBuildConfiguration(
+                "Release")
             defaultBuildSettings = defaultXCBuildConfiguration.getBuildSettings()
-            defaultBuildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS("NDEBUG", "\"COCOS2D_DEBUG=1\"")
+            defaultBuildSettings.replaceGCC_PREPROCESSOR_DEFINITIONS(
+                "NDEBUG", "\"COCOS2D_DEBUG=1\"")
 
         xcodeProj.writeToFile("F:\\", "")
 

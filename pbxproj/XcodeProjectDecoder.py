@@ -296,7 +296,7 @@ class StringDecoder(Decoder):
 
     def allowGenXPValueBeforeFinish(self):
         return False
-    
+
     def className(self):
         return "StringDecoder"
 
