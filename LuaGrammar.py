@@ -25,21 +25,46 @@ class CommentsParser(object):
         
     def parse(self, lua_txt, index, lua_txt_len)
         is_comments_begin = False
+        is_chunck_begin = False
         cross_bar_begin = False
         cross_bar_count = 0
         loop = 0
         while True:
             ch = lua_txt[index]
             if is_comments_begin:
-
+                if ch == '[':
+                    nextCh = lua_txt[index + 1]
+                    if nextCh == '[':
+                        is_chunck_begin = True
+                        loop += 2
+                    else:
+                        break
+                else if ch == '\n':
+                    break
+            else if is_chunck_begin:
+                if ch == ']':
+                    nextCh = lua_txt[index + 1]
+                    if nextCh == ']'
+                        loop += 2
+                        break
             else:
                 if ch == '-':
-                    nextCh = lua_txt[index+1]
+                    nextCh = lua_txt[index + 1]
                     if nextCh == '-':
                         is_comments_begin = True
                         loop += 2 # 跳到--下一个
+                    else:
+                        break
                 else:
                     break
+        return loop
+
+
+class FunctionParser(object)
+
+    def __init__(self):
+
+    def parse(self, lua_txt, index, lua_txt_len)
 
 
 
